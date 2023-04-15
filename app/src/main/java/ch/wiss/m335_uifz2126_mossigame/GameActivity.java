@@ -2,6 +2,7 @@ package ch.wiss.m335_uifz2126_mossigame;
 
 import androidx.appcompat.app.AppCompatActivity;
 
+import android.content.Intent;
 import android.os.Bundle;
 import android.os.Handler;
 import android.util.Log;
@@ -17,6 +18,7 @@ import java.util.Random;
 
 public class GameActivity extends AppCompatActivity implements Runnable {
 
+    private static final int REFRESH_RATE = 1000;
     FrameLayout playground;
     Random random;
 
@@ -24,6 +26,13 @@ public class GameActivity extends AppCompatActivity implements Runnable {
 
     Handler handler;
     private Date tStart;
+
+    TextView textViewTime;
+    TextView textViewMossis;
+
+    FrameLayout progressBarTime;
+    FrameLayout progressBarMossis;
+    private long timeRemaining;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -36,8 +45,14 @@ public class GameActivity extends AppCompatActivity implements Runnable {
         txtRound = findViewById(R.id.txtRunde);
         txtScore = findViewById(R.id.txtPunkte);
 
+        textViewTime = findViewById(R.id.textViewTime);
+        textViewMossis = findViewById(R.id.textViewMossis);
+
+        progressBarTime = findViewById(R.id.progressBarTime);
+        progressBarMossis = findViewById(R.id.progressBarMossis);
+
         startNextLevel();
-        handler.postDelayed(this, 1000);
+        handler.postDelayed(this, REFRESH_RATE);
 
     }
 
@@ -75,13 +90,14 @@ public class GameActivity extends AppCompatActivity implements Runnable {
     int mossisCatched;
     private int level;
     private int mossisToCatch;
-    static final private int LEVEL_TIME = 30;
+    static final private int LEVEL_TIME = 20;
 
     private void removeMossi(View killedMossi) {
         score++;
         mossisCatched++;
         playground.removeView(killedMossi);
         txtScore.setText("Score: "+ score);
+        updateProgressMossis();
     }
 
     /**
@@ -93,14 +109,31 @@ public class GameActivity extends AppCompatActivity implements Runnable {
         mossisCatched = 0;
         tStart = new Date();
         txtRound.setText("Level "+ level);
+        updateProgressTime();
+        updateProgressMossis();
+    }
 
+    private void updateProgressTime(){
+        FrameLayout.LayoutParams params = (FrameLayout.LayoutParams) progressBarTime.getLayoutParams();
+        params.width = (int) ((double)timeRemaining/LEVEL_TIME/1000 * playground.getWidth());
+        progressBarTime.setLayoutParams(params);
+        textViewTime.setText(String.valueOf(timeRemaining/1000));
+    }
+
+    private void updateProgressMossis(){
+        FrameLayout.LayoutParams params = (FrameLayout.LayoutParams) progressBarMossis.getLayoutParams();
+        params.width = (int)((double)mossisCatched/mossisToCatch * playground.getWidth());
+        progressBarMossis.setLayoutParams(params);
+
+        textViewMossis.setText(String.valueOf(mossisCatched));
     }
 
     public void decrementTime(){
         Log.d("MOSSI", "decrement time");
         if (!gameFinished()){
             if (!levelFinished()){
-                generateMossi();
+                addRandomMossi();
+                updateProgressTime();
             } else {
                 Log.d("MOSSI", "next level");
                 startNextLevel();
@@ -116,6 +149,13 @@ public class GameActivity extends AppCompatActivity implements Runnable {
                     playground.removeView(v);
                 }
             }
+
+            handler.postDelayed(()->{
+                Intent retour = new Intent();
+                retour.putExtra("SCORE", score);
+                setResult(RESULT_OK, retour);
+                finish();
+            }, 2000);
             //Show Game over
         }
     }
@@ -125,13 +165,24 @@ public class GameActivity extends AppCompatActivity implements Runnable {
     }
 
     private boolean gameFinished() {
-        long timeRemaining = LEVEL_TIME * 1000 - (new Date().getTime() - tStart.getTime());
+        timeRemaining = LEVEL_TIME * 1000 - (new Date().getTime() - tStart.getTime());
         return timeRemaining <= 0 && mossisCatched < mossisToCatch;
+    }
+
+    private void addRandomMossi() {
+        int zyklen = LEVEL_TIME * 1000 / REFRESH_RATE;
+        double zufall = random.nextDouble();
+        double pMossi = 1.5 * mossisToCatch/zyklen;
+        if (pMossi>1){
+            generateMossi();
+            pMossi = pMossi-1;
+        }
+        if (zufall < pMossi) generateMossi();
     }
 
     @Override
     public void run() {
         decrementTime();
-        handler.postDelayed(this,1000);
+        handler.postDelayed(this,REFRESH_RATE);
     }
 }
